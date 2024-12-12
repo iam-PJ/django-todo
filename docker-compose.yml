@@ -1,0 +1,21 @@
+version: '3.9'
+services:
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+      - "80:80"
+    networks:
+      - mynet
+
+  web:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    networks:
+      - mynet
+
+networks:
+  mynet:
+
