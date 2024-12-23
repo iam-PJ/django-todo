@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: django-todo-container
-        image: prathmeshj476/django-todo-web
+        image: prathmeshj476/updated-django-todo-web
         ports:
         - containerPort: 8000
         livenessProbe:
