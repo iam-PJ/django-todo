@@ -1,0 +1,26 @@
+route:
+  group_by:
+    - alertname
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: email-notifier
+receivers:
+  - name: email-notifier
+    email_configs:
+      - to: jprathmesh432@gmail.com
+        from: alertmanager@example.com
+        smarthost: smtp.gmail.com:587
+        auth_username: jprathmesh432@gmail.com
+        auth_identity: jprathmesh432@gmail.com
+        auth_password: volo bnlr puma ghqe
+        send_resolved: true
+inhibit_rules:
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal:
+      - alertname
+      - dev
+      - instance
