@@ -1,0 +1,72 @@
+groups:
+  - name: instance-health
+    rules:
+      # 1. Instance Down (up == 0)
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} is down"
+          description: "The instance {{ $labels.instance }} has been unreachable for more than 1 minute."
+
+      # 2. Probe Failed (probe_success == 0) - For Blackbox Exporter
+      - alert: ProbeFailed
+        expr: probe_success == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Probe failed for target {{ $labels.instance }}"
+          description: "The probe for {{ $labels.instance }} has failed. Check connectivity or service availability."
+
+      # 3. Low Available Memory (Below 20%)
+      - alert: LowAvailableMemory
+        expr: (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 < 20
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low available memory on {{ $labels.instance }}"
+          description: "Available memory is below 20% on {{ $labels.instance }} for more than 2 minutes."
+
+      # 4. High CPU Usage (> 80%)
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 80% on {{ $labels.instance }} for more than 2 minutes."
+
+      # 5. High Memory Usage (> 80%)
+      - alert: HighMemoryUsage
+        expr: ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 80% on {{ $labels.instance }} for more than 2 minutes."
+
+      # 6. High Disk Space Usage (> 80%) ✅ New
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} - node_filesystem_free_bytes{fstype!~"tmpfs|overlay"}) / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"} * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is above 80% on {{ $labels.instance }} for more than 2 minutes."
+
+      # 7. Filesystem Read-Only ✅ New
+      - alert: FilesystemReadOnly
+        expr: node_filesystem_readonly == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Filesystem is read-only on {{ $labels.instance }}"
+          description: "The filesystem on {{ $labels.instance }} is in read-only mode. This may cause service disruptions."
