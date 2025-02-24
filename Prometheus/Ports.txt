@@ -1,0 +1,11 @@
+Ports
+22    - SSH (TCP, IPv4, 0.0.0.0/0)  
+80    - HTTP (TCP, IPv4, 0.0.0.0/0)  
+443   - HTTPS (TCP, IPv4, 0.0.0.0/0)  
+587   - Custom TCP (SMTP, IPv4, 0.0.0.0/0)  
+3000  - Grafana (TCP, IPv4, 0.0.0.0/0)  
+9090  - Prometheus (TCP, IPv4, 0.0.0.0/0)  
+9093  - Alertmanager (TCP, IPv4, 0.0.0.0/0)  
+9100  - Node Exporter (TCP, IPv4, 0.0.0.0/0)  
+9115  - Blackbox Exporter (TCP, IPv4, 0.0.0.0/0)
+9090
