@@ -21,7 +21,8 @@ spec:
     spec:
       containers:
       - name: django-todo-container
-        image: prathmeshj476/updated-django-todo-web
+        image: prathmeshj476/updated-django-todo-web:latest  # Ensure the correct image is used
+        imagePullPolicy: Always  # Force Kubernetes to always pull the latest image
         ports:
         - containerPort: 8000
         livenessProbe:
