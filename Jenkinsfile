@@ -2,74 +2,101 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USERNAME = 'prathmeshj476'
-        IMAGE_NAME = 'new-django-todo'  // Image Name
-        IMAGE_TAG = 'latest'
-        REMOTE_SERVER = 'ubuntu@18.223.188.173'  // Server Cred.
-        CONTAINER_NAME = 'django'  // container Name
+        IMAGE_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Source Code') {
             steps {
-                echo 'Checkout stage'
-                checkout changelog: false, poll: false, 
-                scm: scmGit(branches: [[name: '*/main']], 
-                            extensions: [], 
-                            userRemoteConfigs: [[url: 'https://github.com/iam-PJ/django-todo.git']])
+                git credentialsId: 'github-credentials-id', 
+                    url: 'https://github.com/iam-PJ/django-todo.git',
+                    branch: 'main'
             }
         }
 
-        stage('Build') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Build Stage'
-                sh "docker build -t $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG ."
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                echo 'Pushing Image to DockerHub'
-                withCredentials([usernamePassword(credentialsId: 'DOCKER_HUB_CREDENTIALS', 
-                                                  usernameVariable: 'DOCKER_USER', 
-                                                  passwordVariable: 'DOCKER_PASS')]) {
+                script {
                     sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push "$DOCKER_USER/$IMAGE_NAME:$IMAGE_TAG"
+                    echo 'Building Docker Image...'
+                    docker build -t prathmeshj476/django-todo:${BUILD_NUMBER} .
                     '''
                 }
             }
         }
 
-        stage('Deploy on Remote Server') {
+        stage('Push Image to Docker Hub') {
             steps {
-                echo 'Deploying Docker container on remote server'
-                sshagent(['Key']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no $REMOTE_SERVER << EOF
-                        docker pull $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG
-                        docker stop $CONTAINER_NAME || true
-                        docker rm $CONTAINER_NAME || true
-                        docker run -d --name $CONTAINER_NAME -p 80:8000 $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG
-                        exit
-                    EOF
-                    """
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'docker-credentials-id', 
+                        passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sh '''
+                        echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+                        echo 'Pushing Docker Image...'
+                        docker push prathmeshj476/django-todo:${BUILD_NUMBER}
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Checkout K8S Manifest Repo') {
+            steps {
+                git credentialsId: 'github-credentials-id', 
+                    url: 'https://github.com/iam-PJ/k8s-manifests.git',
+                    branch: 'master'
+            }
+        }
+
+        stage('Update Kubernetes Manifest & Push') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials-id', 
+                        passwordVariable: 'GIT_PASSWORD', usernameVariable: 'GIT_USERNAME')]) {
+                        sh '''
+                        echo "Checking current deploy.yaml..."
+                        cat deploy.yaml
+
+                        echo "Updating image version in deploy.yaml..."
+                        sed -i "s|image: prathmeshj476/.*|image: prathmeshj476/django-todo:${BUILD_NUMBER}|g" deploy.yaml
+
+                        echo "Verifying changes..."
+                        cat deploy.yaml
+
+                        if git diff --quiet; then
+                          echo "No changes detected in deploy.yaml. Skipping commit."
+                        else
+                          git add deploy.yaml
+                          git commit -m 'Updated deployment image | Jenkins Pipeline'
+                          git push https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/iam-PJ/k8s-manifests.git HEAD:master
+                        fi
+                        '''                        
+                    }
                 }
             }
         }
 
-        stage('Cleanup') {
+        stage('Deploy to Kubernetes Cluster') {
             steps {
-                echo 'Cleaning up local Docker images'
-                sh "docker rmi $DOCKERHUB_USERNAME/$IMAGE_NAME:$IMAGE_TAG || true"
+                script {
+                    sshagent(['Key']) {
+                        sh '''
+                        ssh -o StrictHostKeyChecking=no ubuntu@34.215.175.120 <<EOF
+                            echo "Cloning latest Kubernetes manifests..."
+                            rm -rf k8s-manifests
+                            git clone https://github.com/iam-PJ/k8s-manifests.git
+
+                            echo "Applying Kubernetes deployment..."
+                            sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f k8s-manifests/deploy.yaml --validate=false
+                            sudo KUBECONFIG=/etc/kubernetes/admin.conf kubectl apply -f k8s-manifests/service.yaml --validate=false
+
+                            echo "Deployment completed!"
+EOF
+                        '''
+                    }
+                }
             }
         }
     }
-
-    post {
-        always {
-            echo 'Logging out from Docker Hub'
-            sh "docker logout"
-        }
-    }
 }
+
