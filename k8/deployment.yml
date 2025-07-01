@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: django-todo-container
-        image: prathmeshj476/django-todo:9
+        image: prathmeshj476/django-todo:10
         imagePullPolicy: Always  # Force Kubernetes to always pull the latest image
         ports:
         - containerPort: 8000
